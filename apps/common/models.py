@@ -5,6 +5,7 @@ These patterns are extracted from djengooCalendar and adapted for railway infras
 """
 import uuid
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
 
 
@@ -45,3 +46,24 @@ class SoftDeleteModel(models.Model):
         self.is_deleted = False
         self.deleted_at = None
         self.save(update_fields=['is_deleted', 'deleted_at'])
+
+
+class UserProfile(TimeStampedModel):
+    """Extends Django User with railway-specific fields."""
+
+    class Role(models.TextChoices):
+        ADMIN = 'ADMIN', 'Admin'
+        OPERATOR = 'OPERATOR', 'Operator'
+        ANALYST = 'ANALYST', 'Analyst'
+        VIEWER = 'VIEWER', 'Viewer'
+        API_USER = 'API_USER', 'API User'
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='profile'
+    )
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.VIEWER)
+
+    def __str__(self):
+        return f"{self.user.username} ({self.role})"

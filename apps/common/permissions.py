@@ -35,7 +35,7 @@ class RailwayPermissions:
         """Check if user can create/update/delete nodes."""
         if user.is_superuser:
             return True
-        return hasattr(user, 'role') and user.role in [
+        return hasattr(user, 'profile') and user.profile.role in [
             RailwayPermissions.ADMIN,
             RailwayPermissions.OPERATOR
         ]
@@ -45,7 +45,7 @@ class RailwayPermissions:
         """Check if user can modify schedules."""
         if user.is_superuser:
             return True
-        return hasattr(user, 'role') and user.role in [
+        return hasattr(user, 'profile') and user.profile.role in [
             RailwayPermissions.ADMIN,
             RailwayPermissions.OPERATOR
         ]
@@ -55,7 +55,7 @@ class RailwayPermissions:
         """Check if user can execute simulations."""
         if user.is_superuser:
             return True
-        return hasattr(user, 'role') and user.role in [
+        return hasattr(user, 'profile') and user.profile.role in [
             RailwayPermissions.ADMIN,
             RailwayPermissions.OPERATOR,
             RailwayPermissions.ANALYST
@@ -66,7 +66,7 @@ class RailwayPermissions:
         """Check if user can create/update incidents."""
         if user.is_superuser:
             return True
-        return hasattr(user, 'role') and user.role in [
+        return hasattr(user, 'profile') and user.profile.role in [
             RailwayPermissions.ADMIN,
             RailwayPermissions.OPERATOR
         ]
@@ -76,7 +76,7 @@ class RailwayPermissions:
         """Check if user can acknowledge alerts."""
         if user.is_superuser:
             return True
-        return hasattr(user, 'role') and user.role in [
+        return hasattr(user, 'profile') and user.profile.role in [
             RailwayPermissions.ADMIN,
             RailwayPermissions.OPERATOR
         ]
@@ -86,7 +86,7 @@ class RailwayPermissions:
         """Check if user can view reports."""
         if user.is_superuser:
             return True
-        return hasattr(user, 'role') and user.role in [
+        return hasattr(user, 'profile') and user.profile.role in [
             RailwayPermissions.ADMIN,
             RailwayPermissions.OPERATOR,
             RailwayPermissions.ANALYST
@@ -95,7 +95,7 @@ class RailwayPermissions:
     @staticmethod
     def can_manage_users(user):
         """Check if user can manage other users."""
-        return user.is_superuser or (hasattr(user, 'role') and user.role == RailwayPermissions.ADMIN)
+        return user.is_superuser or (hasattr(user, 'profile') and user.profile.role == RailwayPermissions.ADMIN)
 
     @staticmethod
     def check_permission(user, permission_name):
