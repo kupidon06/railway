@@ -1,0 +1,1289 @@
+{
+  "project": {
+    "name": "Railway Digital Twin",
+    "description": "Plateforme de Jumeau Numérique Intelligent pour Nœud Ferroviaire",
+    "version": "1.0.0",
+    "database": "SQLite (dev) / PostgreSQL + TimescaleDB (prod)",
+    "structure": {
+      "type": "Apps-based organization",
+      "description": "Apps organisées dans un dossier apps/ pour une meilleure structure",
+      "root_directory": "/Users/mac/Desktop/authy/railway/",
+      "apps_directory": "apps/",
+      "settings_directory": "project/settings/",
+      "root_config": "project/"
+    }
+  },
+  "architecture": {
+    "description": "Structure Django modulaire avec séparation des préoccupations",
+    "directories": {
+      "apps/": "Toutes les applications Django",
+      "apps/common/": "Modèles abstraits et utilitaires partagés (common)",
+      "apps/core/": "Modèles de données fondamentaux (railway_core)",
+      "apps/twin/": "Jumeau numérique temps réel (railway_twin)",
+      "apps/simulation/": "Moteur de simulation (railway_simulation)",
+      "apps/ai/": "Intelligence artificielle et ML (railway_ai)",
+      "apps/analytics/": "Analytics et reporting (railway_analytics)",
+      "project/": "Configuration Django principale",
+      "project/settings/": "Settings multi-environnement (base, development, production)"
+    },
+    "naming_convention": {
+      "filesystem": "Noms de dossiers simplifiés sans préfixe (core, twin, ai, etc.)",
+      "django_apps": "Noms complets dans INSTALLED_APPS (railway_core, railway_twin, etc.)",
+      "rationale": "Le préfixe 'railway_' est implicite dans le contexte du projet"
+    }
+  },
+  "apps": {
+    "common": {
+      "path": "apps/common/",
+      "django_app_name": "common",
+      "description": "Modèles abstraits et utilitaires partagés",
+      "models": {
+        "TimeStampedModel": {
+          "abstract": true,
+          "description": "Modèle de base avec timestamps automatiques",
+          "fields": {
+            "created_at": {
+              "type": "DateTimeField",
+              "auto_now_add": true,
+              "indexed": true,
+              "description": "Date de création"
+            },
+            "updated_at": {
+              "type": "DateTimeField",
+              "auto_now": true,
+              "description": "Date de dernière modification"
+            }
+          }
+        },
+        "SoftDeleteModel": {
+          "abstract": true,
+          "description": "Modèle de base avec suppression douce (soft delete)",
+          "fields": {
+            "is_deleted": {
+              "type": "BooleanField",
+              "default": false,
+              "indexed": true,
+              "description": "Marqueur de suppression"
+            },
+            "deleted_at": {
+              "type": "DateTimeField",
+              "nullable": true,
+              "description": "Date de suppression"
+            }
+          },
+          "methods": [
+            "soft_delete()",
+            "restore()"
+          ]
+        }
+      }
+    },
+    "railway_core": {
+      "path": "apps/core/",
+      "django_app_name": "railway_core",
+      "description": "Modèles de données fondamentaux du système ferroviaire",
+      "models": {
+        "Node": {
+          "description": "Nœud ferroviaire (station, jonction, dépôt)",
+          "inherits": ["TimeStampedModel", "SoftDeleteModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true,
+              "description": "Identifiant unique"
+            },
+            "code": {
+              "type": "CharField",
+              "max_length": 20,
+              "unique": true,
+              "example": "PARIS_NORD",
+              "description": "Code unique du nœud"
+            },
+            "name": {
+              "type": "CharField",
+              "max_length": 255,
+              "example": "Paris Gare du Nord",
+              "description": "Nom complet"
+            },
+            "latitude": {
+              "type": "DecimalField",
+              "max_digits": 9,
+              "decimal_places": 6,
+              "example": 48.8809,
+              "description": "Coordonnée GPS latitude"
+            },
+            "longitude": {
+              "type": "DecimalField",
+              "max_digits": 9,
+              "decimal_places": 6,
+              "example": 2.3553,
+              "description": "Coordonnée GPS longitude"
+            },
+            "capacity": {
+              "type": "IntegerField",
+              "default": 10,
+              "description": "Nombre de voies"
+            },
+            "node_type": {
+              "type": "CharField",
+              "max_length": 20,
+              "choices": ["STATION", "JUNCTION", "DEPOT"],
+              "description": "Type de nœud"
+            },
+            "timezone": {
+              "type": "CharField",
+              "max_length": 64,
+              "default": "UTC",
+              "example": "Europe/Paris",
+              "description": "Fuseau horaire"
+            }
+          },
+          "relations": {
+            "tracks": {
+              "type": "OneToMany",
+              "to": "Track",
+              "description": "Voies du nœud"
+            },
+            "schedules": {
+              "type": "OneToMany",
+              "to": "Schedule",
+              "description": "Horaires au nœud"
+            },
+            "incidents": {
+              "type": "OneToMany",
+              "to": "Incident",
+              "description": "Incidents du nœud"
+            },
+            "events": {
+              "type": "OneToMany",
+              "to": "Event",
+              "description": "Événements du nœud"
+            }
+          },
+          "methods": [
+            "get_active_tracks()",
+            "get_current_occupancy_rate()"
+          ]
+        },
+        "Track": {
+          "description": "Voie physique au sein d'un nœud",
+          "inherits": ["TimeStampedModel", "SoftDeleteModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true
+            },
+            "code": {
+              "type": "CharField",
+              "max_length": 50,
+              "unique": true,
+              "example": "PARIS_NORD_T1",
+              "description": "Code unique de la voie"
+            },
+            "name": {
+              "type": "CharField",
+              "max_length": 255,
+              "example": "Voie 1",
+              "description": "Nom de la voie"
+            },
+            "node": {
+              "type": "ForeignKey",
+              "to": "Node",
+              "description": "Nœud parent"
+            },
+            "track_number": {
+              "type": "IntegerField",
+              "example": 1,
+              "description": "Numéro de voie"
+            },
+            "length_meters": {
+              "type": "DecimalField",
+              "max_digits": 10,
+              "decimal_places": 2,
+              "nullable": true,
+              "example": 600.50,
+              "description": "Longueur en mètres"
+            },
+            "max_speed_kmh": {
+              "type": "IntegerField",
+              "default": 120,
+              "example": 160,
+              "description": "Vitesse maximale en km/h"
+            },
+            "direction": {
+              "type": "CharField",
+              "max_length": 20,
+              "choices": ["INBOUND", "OUTBOUND", "BIDIRECTIONAL"],
+              "description": "Direction de la voie"
+            },
+            "status": {
+              "type": "CharField",
+              "max_length": 20,
+              "choices": ["OPERATIONAL", "MAINTENANCE", "CLOSED"],
+              "default": "OPERATIONAL",
+              "description": "Statut opérationnel"
+            }
+          },
+          "relations": {
+            "schedules": {
+              "type": "OneToMany",
+              "to": "Schedule",
+              "description": "Horaires sur cette voie"
+            }
+          },
+          "methods": [
+            "is_available()"
+          ]
+        },
+        "Train": {
+          "description": "Train circulant sur le réseau",
+          "inherits": ["TimeStampedModel", "SoftDeleteModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true
+            },
+            "train_number": {
+              "type": "CharField",
+              "max_length": 20,
+              "unique": true,
+              "example": "TGV8501",
+              "description": "Numéro de train unique"
+            },
+            "train_type": {
+              "type": "CharField",
+              "max_length": 50,
+              "choices": ["TGV", "INTERCITE", "TER", "CARGO", "MAINTENANCE"],
+              "description": "Type de train"
+            },
+            "operator": {
+              "type": "CharField",
+              "max_length": 100,
+              "example": "SNCF",
+              "description": "Compagnie opératrice"
+            },
+            "capacity_passengers": {
+              "type": "IntegerField",
+              "nullable": true,
+              "example": 500,
+              "description": "Capacité passagers (null pour cargo)"
+            },
+            "length_meters": {
+              "type": "DecimalField",
+              "max_digits": 6,
+              "decimal_places": 2,
+              "example": 200.00,
+              "description": "Longueur du train en mètres"
+            },
+            "max_speed_kmh": {
+              "type": "IntegerField",
+              "example": 320,
+              "description": "Vitesse maximale en km/h"
+            }
+          },
+          "relations": {
+            "schedules": {
+              "type": "OneToMany",
+              "to": "Schedule",
+              "description": "Horaires du train"
+            },
+            "positions": {
+              "type": "OneToMany",
+              "to": "TrainPosition",
+              "description": "Positions temps réel"
+            }
+          },
+          "methods": [
+            "get_current_schedule()"
+          ]
+        },
+        "Schedule": {
+          "description": "Horaire de passage d'un train à un nœud",
+          "inherits": ["TimeStampedModel", "SoftDeleteModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true
+            },
+            "train": {
+              "type": "ForeignKey",
+              "to": "Train",
+              "description": "Train concerné"
+            },
+            "node": {
+              "type": "ForeignKey",
+              "to": "Node",
+              "description": "Nœud de passage"
+            },
+            "track": {
+              "type": "ForeignKey",
+              "to": "Track",
+              "nullable": true,
+              "description": "Voie assignée"
+            },
+            "scheduled_arrival": {
+              "type": "DateTimeField",
+              "indexed": true,
+              "example": "2024-03-20T10:30:00Z",
+              "description": "Heure d'arrivée prévue"
+            },
+            "scheduled_departure": {
+              "type": "DateTimeField",
+              "indexed": true,
+              "example": "2024-03-20T10:45:00Z",
+              "description": "Heure de départ prévue"
+            },
+            "actual_arrival": {
+              "type": "DateTimeField",
+              "nullable": true,
+              "description": "Heure d'arrivée réelle"
+            },
+            "actual_departure": {
+              "type": "DateTimeField",
+              "nullable": true,
+              "description": "Heure de départ réelle"
+            },
+            "status": {
+              "type": "CharField",
+              "max_length": 20,
+              "choices": ["SCHEDULED", "ON_TIME", "DELAYED", "CANCELLED", "COMPLETED"],
+              "default": "SCHEDULED",
+              "description": "Statut de l'horaire"
+            },
+            "delay_minutes": {
+              "type": "IntegerField",
+              "default": 0,
+              "example": 15,
+              "description": "Retard en minutes"
+            },
+            "notes": {
+              "type": "TextField",
+              "description": "Notes additionnelles"
+            }
+          },
+          "methods": [
+            "calculate_delay()",
+            "update_status()"
+          ]
+        },
+        "Event": {
+          "description": "Événement horodaté du système (TimescaleDB)",
+          "inherits": ["TimeStampedModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true
+            },
+            "timestamp": {
+              "type": "DateTimeField",
+              "indexed": true,
+              "description": "Horodatage de l'événement (clé de partition TimescaleDB)"
+            },
+            "event_type": {
+              "type": "CharField",
+              "max_length": 50,
+              "choices": ["ARRIVAL", "DEPARTURE", "DELAY", "TRACK_CHANGE", "MAINTENANCE", "ALERT", "INCIDENT"],
+              "description": "Type d'événement"
+            },
+            "train": {
+              "type": "ForeignKey",
+              "to": "Train",
+              "nullable": true,
+              "description": "Train concerné"
+            },
+            "node": {
+              "type": "ForeignKey",
+              "to": "Node",
+              "description": "Nœud où l'événement s'est produit"
+            },
+            "track": {
+              "type": "ForeignKey",
+              "to": "Track",
+              "nullable": true,
+              "description": "Voie concernée"
+            },
+            "severity": {
+              "type": "CharField",
+              "max_length": 20,
+              "choices": ["INFO", "WARNING", "CRITICAL"],
+              "default": "INFO",
+              "description": "Sévérité de l'événement"
+            },
+            "description": {
+              "type": "TextField",
+              "description": "Description détaillée"
+            },
+            "metadata": {
+              "type": "JSONField",
+              "default": {},
+              "description": "Données additionnelles (JSON)"
+            }
+          }
+        },
+        "Incident": {
+          "description": "Incident opérationnel affectant le réseau",
+          "inherits": ["TimeStampedModel", "SoftDeleteModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true
+            },
+            "title": {
+              "type": "CharField",
+              "max_length": 255,
+              "example": "Panne de signalisation",
+              "description": "Titre de l'incident"
+            },
+            "description": {
+              "type": "TextField",
+              "description": "Description détaillée"
+            },
+            "incident_type": {
+              "type": "CharField",
+              "max_length": 50,
+              "choices": ["TECHNICAL", "WEATHER", "ACCIDENT", "SECURITY", "STRIKE", "OTHER"],
+              "description": "Type d'incident"
+            },
+            "severity": {
+              "type": "CharField",
+              "max_length": 20,
+              "choices": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+              "description": "Sévérité"
+            },
+            "node": {
+              "type": "ForeignKey",
+              "to": "Node",
+              "description": "Nœud affecté"
+            },
+            "affected_tracks": {
+              "type": "ManyToManyField",
+              "to": "Track",
+              "description": "Voies affectées"
+            },
+            "affected_trains": {
+              "type": "ManyToManyField",
+              "to": "Train",
+              "description": "Trains affectés"
+            },
+            "started_at": {
+              "type": "DateTimeField",
+              "description": "Début de l'incident"
+            },
+            "resolved_at": {
+              "type": "DateTimeField",
+              "nullable": true,
+              "description": "Résolution de l'incident"
+            },
+            "status": {
+              "type": "CharField",
+              "max_length": 20,
+              "choices": ["ACTIVE", "MONITORING", "RESOLVED"],
+              "description": "Statut de l'incident"
+            },
+            "reported_by": {
+              "type": "ForeignKey",
+              "to": "User",
+              "nullable": true,
+              "description": "Utilisateur ayant rapporté l'incident"
+            },
+            "resolution_notes": {
+              "type": "TextField",
+              "description": "Notes de résolution"
+            }
+          },
+          "methods": [
+            "resolve(resolution_notes)",
+            "get_duration()"
+          ]
+        }
+      }
+    },
+    "railway_twin": {
+      "path": "apps/twin/",
+      "django_app_name": "railway_twin",
+      "description": "Modèles pour le jumeau numérique temps réel",
+      "models": {
+        "TrainPosition": {
+          "description": "Position temps réel d'un train (TimescaleDB)",
+          "inherits": ["TimeStampedModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true
+            },
+            "timestamp": {
+              "type": "DateTimeField",
+              "indexed": true,
+              "description": "Horodatage de la position (clé de partition TimescaleDB)"
+            },
+            "train": {
+              "type": "ForeignKey",
+              "to": "Train",
+              "description": "Train suivi"
+            },
+            "current_node": {
+              "type": "ForeignKey",
+              "to": "Node",
+              "nullable": true,
+              "description": "Nœud actuel"
+            },
+            "current_track": {
+              "type": "ForeignKey",
+              "to": "Track",
+              "nullable": true,
+              "description": "Voie actuelle"
+            },
+            "latitude": {
+              "type": "DecimalField",
+              "max_digits": 9,
+              "decimal_places": 6,
+              "nullable": true,
+              "description": "Position GPS latitude"
+            },
+            "longitude": {
+              "type": "DecimalField",
+              "max_digits": 9,
+              "decimal_places": 6,
+              "nullable": true,
+              "description": "Position GPS longitude"
+            },
+            "speed_kmh": {
+              "type": "DecimalField",
+              "max_digits": 5,
+              "decimal_places": 2,
+              "default": 0,
+              "example": 120.50,
+              "description": "Vitesse actuelle en km/h"
+            },
+            "status": {
+              "type": "CharField",
+              "max_length": 20,
+              "choices": ["MOVING", "STOPPED", "BOARDING", "MAINTENANCE"],
+              "default": "STOPPED",
+              "description": "Statut du train"
+            },
+            "metadata": {
+              "type": "JSONField",
+              "default": {},
+              "description": "Métadonnées additionnelles"
+            }
+          },
+          "methods": [
+            "get_latest_for_train(train_id)",
+            "get_active_trains_at_node(node)"
+          ]
+        }
+      }
+    },
+    "railway_simulation": {
+      "path": "apps/simulation/",
+      "django_app_name": "railway_simulation",
+      "description": "Modèles pour le moteur de simulation",
+      "models": {
+        "SimulationScenario": {
+          "description": "Scénario de simulation prédéfini",
+          "inherits": ["TimeStampedModel", "SoftDeleteModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true
+            },
+            "name": {
+              "type": "CharField",
+              "max_length": 255,
+              "example": "Retard TGV 30 minutes",
+              "description": "Nom du scénario"
+            },
+            "description": {
+              "type": "TextField",
+              "description": "Description détaillée"
+            },
+            "scenario_type": {
+              "type": "CharField",
+              "max_length": 50,
+              "choices": ["DELAY", "CLOSURE", "CONGESTION", "INCIDENT", "MAINTENANCE", "CUSTOM"],
+              "description": "Type de scénario"
+            },
+            "parameters": {
+              "type": "JSONField",
+              "default": {},
+              "example": {
+                "train_id": "uuid-TGV8501",
+                "delay_minutes": 30,
+                "start_time": "2024-03-20T10:00:00Z"
+              },
+              "description": "Paramètres du scénario (JSON)"
+            },
+            "target_node": {
+              "type": "ForeignKey",
+              "to": "Node",
+              "nullable": true,
+              "description": "Nœud cible principal"
+            },
+            "created_by": {
+              "type": "ForeignKey",
+              "to": "User",
+              "nullable": true,
+              "description": "Créateur du scénario"
+            },
+            "is_template": {
+              "type": "BooleanField",
+              "default": false,
+              "description": "Est-ce un modèle ?"
+            },
+            "tags": {
+              "type": "JSONField",
+              "default": [],
+              "description": "Tags pour catégorisation"
+            }
+          },
+          "relations": {
+            "runs": {
+              "type": "OneToMany",
+              "to": "SimulationRun",
+              "description": "Exécutions de ce scénario"
+            }
+          },
+          "methods": [
+            "clone(name, created_by)"
+          ]
+        },
+        "SimulationRun": {
+          "description": "Exécution d'un scénario de simulation",
+          "inherits": ["TimeStampedModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true
+            },
+            "scenario": {
+              "type": "ForeignKey",
+              "to": "SimulationScenario",
+              "description": "Scénario exécuté"
+            },
+            "started_at": {
+              "type": "DateTimeField",
+              "description": "Début de l'exécution"
+            },
+            "completed_at": {
+              "type": "DateTimeField",
+              "nullable": true,
+              "description": "Fin de l'exécution"
+            },
+            "status": {
+              "type": "CharField",
+              "max_length": 20,
+              "choices": ["PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"],
+              "default": "PENDING",
+              "description": "Statut de l'exécution"
+            },
+            "results": {
+              "type": "JSONField",
+              "default": {},
+              "example": {
+                "affected_trains": 15,
+                "total_delay_minutes": 450,
+                "conflicts_detected": 3
+              },
+              "description": "Résultats de la simulation (JSON)"
+            },
+            "error_message": {
+              "type": "TextField",
+              "description": "Message d'erreur si échec"
+            },
+            "run_by": {
+              "type": "ForeignKey",
+              "to": "User",
+              "nullable": true,
+              "description": "Utilisateur ayant lancé la simulation"
+            },
+            "execution_time_seconds": {
+              "type": "DecimalField",
+              "max_digits": 10,
+              "decimal_places": 2,
+              "nullable": true,
+              "description": "Temps d'exécution en secondes"
+            },
+            "notes": {
+              "type": "TextField",
+              "description": "Notes utilisateur"
+            }
+          },
+          "methods": [
+            "mark_completed(results)",
+            "mark_failed(error_message)",
+            "get_summary()"
+          ]
+        }
+      }
+    },
+    "railway_ai": {
+      "path": "apps/ai/",
+      "django_app_name": "railway_ai",
+      "description": "Modèles pour l'intelligence artificielle et ML",
+      "models": {
+        "MLModel": {
+          "description": "Version de modèle de machine learning",
+          "inherits": ["TimeStampedModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true
+            },
+            "name": {
+              "type": "CharField",
+              "max_length": 255,
+              "example": "Congestion Predictor v2",
+              "description": "Nom du modèle"
+            },
+            "model_type": {
+              "type": "CharField",
+              "max_length": 50,
+              "choices": [
+                "CONGESTION_PREDICTION",
+                "ANOMALY_DETECTION",
+                "RISK_SCORING",
+                "DELAY_PREDICTION",
+                "DEMAND_FORECASTING"
+              ],
+              "description": "Type de modèle"
+            },
+            "version": {
+              "type": "CharField",
+              "max_length": 50,
+              "example": "v2.1",
+              "description": "Version du modèle"
+            },
+            "algorithm": {
+              "type": "CharField",
+              "max_length": 100,
+              "example": "RandomForest",
+              "description": "Algorithme utilisé (RandomForest, LSTM, IsolationForest)"
+            },
+            "model_path": {
+              "type": "CharField",
+              "max_length": 500,
+              "example": "/models/congestion_v2.1.pkl",
+              "description": "Chemin vers le fichier du modèle"
+            },
+            "metrics": {
+              "type": "JSONField",
+              "default": {},
+              "example": {
+                "accuracy": 0.87,
+                "precision": 0.85,
+                "recall": 0.89,
+                "f1": 0.87
+              },
+              "description": "Métriques de performance (JSON)"
+            },
+            "trained_at": {
+              "type": "DateTimeField",
+              "description": "Date d'entraînement"
+            },
+            "trained_by": {
+              "type": "ForeignKey",
+              "to": "User",
+              "nullable": true,
+              "description": "Utilisateur ayant entraîné le modèle"
+            },
+            "training_duration_seconds": {
+              "type": "IntegerField",
+              "nullable": true,
+              "description": "Durée d'entraînement en secondes"
+            },
+            "training_data_size": {
+              "type": "IntegerField",
+              "nullable": true,
+              "example": 100000,
+              "description": "Nombre d'échantillons d'entraînement"
+            },
+            "training_date_range_start": {
+              "type": "DateTimeField",
+              "nullable": true,
+              "description": "Début de la période de données d'entraînement"
+            },
+            "training_date_range_end": {
+              "type": "DateTimeField",
+              "nullable": true,
+              "description": "Fin de la période de données d'entraînement"
+            },
+            "hyperparameters": {
+              "type": "JSONField",
+              "default": {},
+              "description": "Hyperparamètres du modèle (JSON)"
+            },
+            "is_active": {
+              "type": "BooleanField",
+              "default": false,
+              "description": "Est-ce le modèle actif pour son type ?"
+            },
+            "description": {
+              "type": "TextField",
+              "description": "Description et notes"
+            }
+          },
+          "relations": {
+            "predictions": {
+              "type": "OneToMany",
+              "to": "PredictionResult",
+              "description": "Prédictions de ce modèle"
+            }
+          },
+          "methods": [
+            "activate()",
+            "get_performance_summary()"
+          ]
+        },
+        "PredictionResult": {
+          "description": "Résultat de prédiction ML",
+          "inherits": ["TimeStampedModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true
+            },
+            "model": {
+              "type": "ForeignKey",
+              "to": "MLModel",
+              "description": "Modèle ayant produit la prédiction"
+            },
+            "prediction_time": {
+              "type": "DateTimeField",
+              "indexed": true,
+              "description": "Quand la prédiction a été faite"
+            },
+            "target_time": {
+              "type": "DateTimeField",
+              "indexed": true,
+              "description": "Période cible de la prédiction"
+            },
+            "node": {
+              "type": "ForeignKey",
+              "to": "Node",
+              "nullable": true,
+              "description": "Nœud cible"
+            },
+            "train": {
+              "type": "ForeignKey",
+              "to": "Train",
+              "nullable": true,
+              "description": "Train cible"
+            },
+            "prediction_value": {
+              "type": "JSONField",
+              "example": {
+                "risk_score": 85,
+                "probability": 0.73,
+                "confidence": 0.89
+              },
+              "description": "Valeur de prédiction (JSON)"
+            },
+            "confidence_score": {
+              "type": "DecimalField",
+              "max_digits": 5,
+              "decimal_places": 4,
+              "example": 0.8900,
+              "description": "Score de confiance (0-1)"
+            },
+            "actual_outcome": {
+              "type": "JSONField",
+              "nullable": true,
+              "description": "Résultat réel pour feedback (JSON)"
+            },
+            "accuracy": {
+              "type": "DecimalField",
+              "max_digits": 5,
+              "decimal_places": 4,
+              "nullable": true,
+              "description": "Précision de la prédiction (0-1)"
+            },
+            "feedback_recorded_at": {
+              "type": "DateTimeField",
+              "nullable": true,
+              "description": "Quand le feedback a été enregistré"
+            },
+            "metadata": {
+              "type": "JSONField",
+              "default": {},
+              "description": "Métadonnées additionnelles"
+            }
+          },
+          "methods": [
+            "record_feedback(actual_outcome)",
+            "get_risk_level()"
+          ]
+        }
+      }
+    },
+    "railway_analytics": {
+      "path": "apps/analytics/",
+      "django_app_name": "railway_analytics",
+      "description": "Modèles pour analytics et reporting",
+      "models": {
+        "Alert": {
+          "description": "Alerte système pour événements importants",
+          "inherits": ["TimeStampedModel"],
+          "fields": {
+            "id": {
+              "type": "UUIDField",
+              "primary_key": true
+            },
+            "alert_type": {
+              "type": "CharField",
+              "max_length": 50,
+              "choices": [
+                "CONGESTION",
+                "DELAY",
+                "INCIDENT",
+                "ANOMALY",
+                "MAINTENANCE",
+                "PREDICTION",
+                "SYSTEM"
+              ],
+              "description": "Type d'alerte"
+            },
+            "severity": {
+              "type": "CharField",
+              "max_length": 20,
+              "choices": ["INFO", "WARNING", "CRITICAL"],
+              "description": "Sévérité"
+            },
+            "title": {
+              "type": "CharField",
+              "max_length": 255,
+              "example": "Congestion Alert: Paris Nord",
+              "description": "Titre de l'alerte"
+            },
+            "message": {
+              "type": "TextField",
+              "description": "Message détaillé"
+            },
+            "node": {
+              "type": "ForeignKey",
+              "to": "Node",
+              "nullable": true,
+              "description": "Nœud concerné"
+            },
+            "train": {
+              "type": "ForeignKey",
+              "to": "Train",
+              "nullable": true,
+              "description": "Train concerné"
+            },
+            "incident": {
+              "type": "ForeignKey",
+              "to": "Incident",
+              "nullable": true,
+              "description": "Incident lié"
+            },
+            "metadata": {
+              "type": "JSONField",
+              "default": {},
+              "description": "Données additionnelles"
+            },
+            "is_acknowledged": {
+              "type": "BooleanField",
+              "default": false,
+              "indexed": true,
+              "description": "Alerte acquittée ?"
+            },
+            "acknowledged_by": {
+              "type": "ForeignKey",
+              "to": "User",
+              "nullable": true,
+              "description": "Utilisateur ayant acquitté"
+            },
+            "acknowledged_at": {
+              "type": "DateTimeField",
+              "nullable": true,
+              "description": "Date d'acquittement"
+            },
+            "acknowledgement_notes": {
+              "type": "TextField",
+              "description": "Notes d'acquittement"
+            },
+            "auto_dismiss_at": {
+              "type": "DateTimeField",
+              "nullable": true,
+              "description": "Auto-rejet à cette date"
+            },
+            "is_dismissed": {
+              "type": "BooleanField",
+              "default": false,
+              "indexed": true,
+              "description": "Alerte rejetée ?"
+            },
+            "dismissed_at": {
+              "type": "DateTimeField",
+              "nullable": true,
+              "description": "Date de rejet"
+            }
+          },
+          "methods": [
+            "acknowledge(user, notes)",
+            "dismiss()",
+            "get_active_alerts(node)",
+            "create_congestion_alert(node, risk_score, details)",
+            "create_delay_alert(train, delay_minutes, node)"
+          ]
+        }
+      }
+    }
+  },
+  "data_flow": {
+    "real_time_tracking": {
+      "description": "Flux de données pour le suivi temps réel",
+      "flow": [
+        {
+          "step": 1,
+          "source": "External System / Sensors",
+          "action": "Envoi position train",
+          "target": "TrainPosition",
+          "app": "apps/twin/"
+        },
+        {
+          "step": 2,
+          "source": "TrainPosition",
+          "action": "Mise à jour statut",
+          "target": "Schedule",
+          "app": "apps/core/"
+        },
+        {
+          "step": 3,
+          "source": "Schedule",
+          "action": "Calcul retard",
+          "target": "Event",
+          "app": "apps/core/"
+        },
+        {
+          "step": 4,
+          "source": "Event",
+          "action": "Détection anomalie",
+          "target": "Alert",
+          "app": "apps/analytics/"
+        }
+      ]
+    },
+    "prediction_workflow": {
+      "description": "Flux de travail pour les prédictions IA",
+      "flow": [
+        {
+          "step": 1,
+          "source": "Historical Data (Event, Schedule)",
+          "action": "Entraînement",
+          "target": "MLModel",
+          "app": "apps/ai/"
+        },
+        {
+          "step": 2,
+          "source": "MLModel + Current Data",
+          "action": "Prédiction",
+          "target": "PredictionResult",
+          "app": "apps/ai/"
+        },
+        {
+          "step": 3,
+          "source": "PredictionResult (high risk)",
+          "action": "Génération alerte",
+          "target": "Alert",
+          "app": "apps/analytics/"
+        },
+        {
+          "step": 4,
+          "source": "Actual Outcome",
+          "action": "Feedback loop",
+          "target": "PredictionResult.actual_outcome",
+          "app": "apps/ai/"
+        }
+      ]
+    },
+    "simulation_workflow": {
+      "description": "Flux de travail pour les simulations",
+      "flow": [
+        {
+          "step": 1,
+          "source": "User",
+          "action": "Création scénario",
+          "target": "SimulationScenario",
+          "app": "apps/simulation/"
+        },
+        {
+          "step": 2,
+          "source": "SimulationScenario",
+          "action": "Lancement simulation",
+          "target": "SimulationRun",
+          "app": "apps/simulation/"
+        },
+        {
+          "step": 3,
+          "source": "SimulationRun + Current Data",
+          "action": "Calcul impacts",
+          "target": "SimulationRun.results",
+          "app": "apps/simulation/"
+        },
+        {
+          "step": 4,
+          "source": "SimulationRun.results",
+          "action": "Visualisation",
+          "target": "Dashboard"
+        }
+      ]
+    }
+  },
+  "key_relationships": {
+    "Node_Track": {
+      "type": "OneToMany",
+      "app": "apps/core/",
+      "description": "Un nœud contient plusieurs voies"
+    },
+    "Train_Schedule": {
+      "type": "OneToMany",
+      "app": "apps/core/",
+      "description": "Un train a plusieurs horaires de passage"
+    },
+    "Node_Schedule": {
+      "type": "OneToMany",
+      "app": "apps/core/",
+      "description": "Un nœud a plusieurs horaires de trains"
+    },
+    "Track_Schedule": {
+      "type": "OneToMany",
+      "app": "apps/core/",
+      "description": "Une voie peut accueillir plusieurs horaires"
+    },
+    "Train_TrainPosition": {
+      "type": "OneToMany",
+      "from": "apps/core/",
+      "to": "apps/twin/",
+      "description": "Un train a plusieurs positions dans le temps"
+    },
+    "Incident_Tracks": {
+      "type": "ManyToMany",
+      "app": "apps/core/",
+      "description": "Un incident peut affecter plusieurs voies"
+    },
+    "Incident_Trains": {
+      "type": "ManyToMany",
+      "app": "apps/core/",
+      "description": "Un incident peut affecter plusieurs trains"
+    },
+    "MLModel_PredictionResult": {
+      "type": "OneToMany",
+      "app": "apps/ai/",
+      "description": "Un modèle ML produit plusieurs prédictions"
+    },
+    "SimulationScenario_SimulationRun": {
+      "type": "OneToMany",
+      "app": "apps/simulation/",
+      "description": "Un scénario peut être exécuté plusieurs fois"
+    }
+  },
+  "indexes": {
+    "description": "Index principaux pour optimisation des requêtes",
+    "time_series": [
+      "Event.timestamp",
+      "TrainPosition.timestamp",
+      "Schedule.scheduled_arrival",
+      "Schedule.scheduled_departure"
+    ],
+    "foreign_keys": [
+      "Track.node",
+      "Schedule.train",
+      "Schedule.node",
+      "Event.node",
+      "Alert.node"
+    ],
+    "status_fields": [
+      "Track.status",
+      "Schedule.status",
+      "Incident.status",
+      "Alert.is_acknowledged",
+      "Alert.is_dismissed"
+    ],
+    "soft_delete": [
+      "Node.is_deleted",
+      "Track.is_deleted",
+      "Train.is_deleted"
+    ]
+  },
+  "demo_data": {
+    "description": "Données de démonstration générées par seed_data",
+    "nodes": {
+      "count": 5,
+      "examples": [
+        "PARIS_NORD - Paris Gare du Nord",
+        "LYON_PART_DIEU - Lyon Part-Dieu",
+        "MARSEILLE_ST_CHARLES - Marseille Saint-Charles"
+      ]
+    },
+    "tracks": {
+      "count": 108,
+      "distribution": "Répartis sur les 5 nœuds selon leur capacité"
+    },
+    "trains": {
+      "count": 11,
+      "types": {
+        "TGV": 3,
+        "INTERCITE": 2,
+        "TER": 4,
+        "CARGO": 2
+      }
+    },
+    "schedules": {
+      "count": 29,
+      "time_range": "Prochaines 24 heures"
+    },
+    "events": {
+      "count": 50,
+      "time_range": "Dernières 24 heures"
+    },
+    "incidents": {
+      "count": 2,
+      "examples": [
+        "Signal Failure at Paris Nord",
+        "Track Maintenance at Lyon"
+      ]
+    }
+  },
+  "migration_notes": {
+    "description": "Notes sur la réorganisation du projet",
+    "old_structure": {
+      "project_name": "railway_project",
+      "apps_location": "root level",
+      "app_names": ["railway_core", "railway_twin", "railway_simulation", "railway_ai", "railway_analytics", "common"]
+    },
+    "new_structure": {
+      "project_name": "railway",
+      "apps_location": "apps/",
+      "folder_names": ["core", "twin", "simulation", "ai", "analytics", "common"],
+      "django_app_names": ["railway_core", "railway_twin", "railway_simulation", "railway_ai", "railway_analytics", "common"]
+    },
+    "changes": [
+      {
+        "change": "Dossier apps/ créé",
+        "reason": "Meilleure organisation pour projets Django multi-apps"
+      },
+      {
+        "change": "Noms de dossiers simplifiés (core au lieu de railway_core)",
+        "reason": "Le préfixe 'railway_' est redondant dans le contexte du dossier apps/"
+      },
+      {
+        "change": "Project config dans project/ au lieu de railway_project/",
+        "reason": "Nom plus générique et cohérent"
+      },
+      {
+        "change": "Projet renommé de railway_project/ à railway/",
+        "reason": "Nom plus court et plus élégant"
+      }
+    ],
+    "benefits": [
+      "Meilleure séparation des préoccupations",
+      "Structure plus scalable pour croissance future",
+      "Facilite l'ajout de nouvelles apps",
+      "Suit les bonnes pratiques Django pour projets d'entreprise",
+      "Code plus maintenable et navigable",
+      "Préparation pour architecture microservices si nécessaire"
+    ]
+  }
+}
